@@ -1,0 +1,6 @@
+@VetiWebApplication_HostAddress = http://localhost:5086
+
+GET {{VetiWebApplication_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

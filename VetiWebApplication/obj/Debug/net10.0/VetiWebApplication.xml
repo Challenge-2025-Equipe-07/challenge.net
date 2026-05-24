@@ -1,0 +1,441 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>VetiWebApplication</name>
+    </assembly>
+    <members>
+        <member name="M:VetiWebApplication.Controllers.ConsultasController.GetAll">
+            <summary>Lista todas as consultas cadastradas.</summary>
+            <remarks>Retorna consultas com dados do pet e do veterinário.</remarks>
+            <returns>Lista de consultas.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ConsultasController.GetById(System.Int32)">
+            <summary>Busca uma consulta pelo ID.</summary>
+            <param name="id">ID da consulta.</param>
+            <returns>Consulta encontrada ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ConsultasController.GetByPet(System.Int32)">
+            <summary>Lista o histórico de consultas de um pet.</summary>
+            <param name="petId">ID do pet.</param>
+            <returns>Lista de consultas do pet ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ConsultasController.Create(VetiWebApplication.Models.ConsultaRequest)">
+             <summary>Registra uma nova consulta.</summary>
+             <remarks>
+             Exemplo de requisição:
+            
+                 POST /api/appointment
+                 {
+                     "dtConsulta": "2026-05-20T10:00:00",
+                     "tpEvento": "Consulta",
+                     "notificar": 1,
+                     "petId": 1,
+                     "veterinarioId": 1
+                 }
+            
+             notificar: 1 = sim, 0 = não
+             tpEvento: Consulta de rotina, Consulta de Emergência, Retorno, Medicação
+             </remarks>
+             <returns>Consulta criada com status 201.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ConsultasController.Update(System.Int32,VetiWebApplication.Models.ConsultaRequest)">
+            <summary>Atualiza os dados de uma consulta.</summary>
+            <param name="id">ID da consulta a ser atualizada.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ConsultasController.Delete(System.Int32)">
+            <summary>Remove uma consulta pelo ID.</summary>
+            <param name="id">ID da consulta a ser removida.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExameMedicamentosController.GetAll">
+            <summary>Lista todos os medicamentos vinculados a exames.</summary>
+            <returns>Lista de relações exame-medicamento.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExameMedicamentosController.GetByExame(System.Int32)">
+            <summary>Lista medicamentos de um exame específico.</summary>
+            <param name="exameId">ID do exame.</param>
+            <returns>Lista de medicamentos do exame ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExameMedicamentosController.GetByMedicamento(System.Int32)">
+            <summary>Lista exames que usaram um medicamento específico.</summary>
+            <param name="medicamentoId">ID do medicamento.</param>
+            <returns>Lista de exames ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExameMedicamentosController.Create(VetiWebApplication.Models.ExameMedicamentoRequest)">
+             <summary>Vincula um medicamento a um exame.</summary>
+             <remarks>
+             Exemplo de requisição:
+            
+                 POST /api/exame-medicamento
+                 {
+                     "exameId": 1,
+                     "medicamentoId": 1,
+                     "qtMedicamento": 2
+                 }
+             </remarks>
+             <returns>Relação criada com status 201.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExameMedicamentosController.Delete(System.Int32,System.Int32)">
+            <summary>Remove a relação entre um exame e um medicamento.</summary>
+            <param name="exameId">ID do exame.</param>
+            <param name="medicamentoId">ID do medicamento.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExamesController.GetAll">
+            <summary>Lista todos os exames cadastrados.</summary>
+            <returns>Lista de exames.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExamesController.GetById(System.Int32)">
+            <summary>Busca um exame pelo ID.</summary>
+            <param name="id">ID do exame.</param>
+            <returns>Exame encontrado ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExamesController.GetByTutor(System.Int32)">
+            <summary>Lista todos os exames de um tutor.</summary>
+            <remarks>Retorna todos os exames de todos os pets vinculados ao tutor.</remarks>
+            <param name="tutorId">ID do tutor.</param>
+            <returns>Lista de exames do tutor ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExamesController.GetByPet(System.Int32)">
+            <summary>Lista todos os exames de um pet.</summary>
+            <remarks>Retorna todos os exames realizados pelo pet informado.</remarks>
+            <param name="petId">ID do pet.</param>
+            <returns>Lista de exames do pet ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExamesController.GetByConsulta(System.Int32)">
+            <summary>Lista exames de uma consulta específica.</summary>
+            <param name="consultaId">ID da consulta.</param>
+            <returns>Lista de exames da consulta ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExamesController.Create(VetiWebApplication.Models.ExameRequest)">
+             <summary>Cadastra um novo exame.</summary>
+             <remarks>
+             Exemplo de requisição:
+            
+                 POST /api/exames
+                 {
+                     "dsDocumento": "hemograma.pdf",
+                     "dtRealizacao": "2026-05-20",
+                     "dsDiagnostico": "Anemia leve",
+                     "consultaId": 1
+                 }
+             </remarks>
+             <returns>Exame criado com status 201.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExamesController.Update(System.Int32,VetiWebApplication.Models.ExameRequest)">
+            <summary>Atualiza os dados de um exame.</summary>
+            <param name="id">ID do exame a ser atualizado.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.ExamesController.Delete(System.Int32)">
+            <summary>Remove um exame pelo ID.</summary>
+            <param name="id">ID do exame a ser removido.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.MedicamentosController.GetAll">
+            <summary>Lista todos os medicamentos cadastrados.</summary>
+            <returns>Lista de medicamentos.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.MedicamentosController.GetById(System.Int32)">
+            <summary>Busca um medicamento pelo ID.</summary>
+            <param name="id">ID do medicamento.</param>
+            <returns>Medicamento encontrado ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.MedicamentosController.Create(VetiWebApplication.Models.MedicamentoRequest)">
+             <summary>Cadastra um novo medicamento.</summary>
+             <remarks>
+             Exemplo de requisição:
+            
+                 POST /api/medicamento
+                 {
+                     "nmMedicamento": "Amoxicilina",
+                     "dsDosagem": "500mg",
+                     "dsFrequencia": "A cada 8 horas"
+                 }
+             </remarks>
+             <returns>Medicamento criado com status 201.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.MedicamentosController.Update(System.Int32,VetiWebApplication.Models.MedicamentoRequest)">
+            <summary>Atualiza os dados de um medicamento.</summary>
+            <param name="id">ID do medicamento a ser atualizado.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.MedicamentosController.Delete(System.Int32)">
+            <summary>Remove um medicamento pelo ID.</summary>
+            <param name="id">ID do medicamento a ser removido.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.PetsController.GetAll">
+            <summary>Lista todos os pets cadastrados.</summary>
+            <remarks>Retorna todos os pets com os dados do tutor responsável.</remarks>
+            <returns>Lista de pets.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.PetsController.GetById(System.Int32)">
+            <summary>Busca um pet pelo ID.</summary>
+            <param name="id">ID do pet.</param>
+            <returns>Pet encontrado ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.PetsController.GetByTutor(System.Int32)">
+            <summary>Lista todos os pets de um tutor.</summary>
+            <param name="tutorId">ID do tutor.</param>
+            <returns>Lista de pets do tutor ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.PetsController.GetByEspecie(System.String)">
+            <summary>Filtra pets por espécie.</summary>
+            <remarks>Exemplo: cachorro, gato, pássaro.</remarks>
+            <param name="especie">Espécie do pet.</param>
+            <returns>Lista de pets da espécie informada ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.PetsController.Create(VetiWebApplication.Models.PetRequest)">
+             <summary>Cadastra um novo pet.</summary>
+             <remarks>
+             Exemplo de requisição:
+            
+                 POST /api/pet
+                 {
+                     "nmPet": "Sauro",
+                     "dsEspecie": "Gato",
+                     "dsRaca": "SRD",
+                     "nrIdade": 6,
+                     "stCastrado": 1,
+                     "tutorId": 1
+                 }
+            
+             stCastrado: 1 = castrado, 0 = não castrado
+             </remarks>
+             <returns>Pet criado com status 201.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.PetsController.Update(System.Int32,VetiWebApplication.Models.PetRequest)">
+            <summary>Atualiza os dados de um pet.</summary>
+            <param name="id">ID do pet a ser atualizado.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.PetsController.Delete(System.Int32)">
+            <summary>Remove um pet pelo ID.</summary>
+            <param name="id">ID do pet a ser removido.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TratamentosController.GetAll">
+            <summary>Lista todos os tratamentos cadastrados.</summary>
+            <returns>Lista de tratamentos.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TratamentosController.GetById(System.Int32)">
+            <summary>Busca um tratamento pelo ID.</summary>
+            <param name="id">ID do tratamento.</param>
+            <returns>Tratamento encontrado ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TratamentosController.GetByPet(System.Int32)">
+            <summary>Lista tratamentos de um pet.</summary>
+            <param name="petId">ID do pet.</param>
+            <returns>Lista de tratamentos do pet ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TratamentosController.Create(VetiWebApplication.Models.TratamentoRequest)">
+             <summary>Cadastra um novo tratamento.</summary>
+             <remarks>
+             Exemplo de requisição:
+            
+                 POST /api/tratamento
+                 {
+                     "dsDiagnostico": "Infecção bacteriana",
+                     "dtInicio": "2026-05-24",
+                     "dtRetornoPrevisto": "2026-06-07",
+                     "dsObservacao": "Manter em repouso",
+                     "petId": 1
+                 }
+             </remarks>
+             <returns>Tratamento criado com status 201.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TratamentosController.AddMedicamento(System.Int32,VetiWebApplication.Models.TratamentoMedicamentoRequest)">
+             <summary>Adiciona um medicamento a um tratamento.</summary>
+             <remarks>
+             Exemplo de requisição:
+            
+                 POST /api/tratamento/1/medicamento
+                 {
+                     "medicamentoId": 1,
+                     "qtMedicamento": 2,
+                     "dsInstrucao": "Tomar após refeição"
+                 }
+             </remarks>
+             <returns>201 em caso de sucesso.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TratamentosController.Update(System.Int32,VetiWebApplication.Models.TratamentoRequest)">
+            <summary>Atualiza um tratamento.</summary>
+            <param name="id">ID do tratamento a ser atualizado.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TratamentosController.Delete(System.Int32)">
+            <summary>Remove um tratamento pelo ID.</summary>
+            <param name="id">ID do tratamento a ser removido.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TutoresController.GetAll">
+            <summary>Lista todos os tutores cadastrados.</summary>
+            <remarks>Retorna todos os tutores com seus respectivos pets.</remarks>
+            <returns>Lista de tutores.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TutoresController.GetById(System.Int32)">
+            <summary>Busca um tutor pelo ID.</summary>
+            <remarks>Retorna o tutor com seus pets cadastrados.</remarks>
+            <param name="id">ID do tutor.</param>
+            <returns>Tutor encontrado ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TutoresController.GetByCpf(System.String)">
+            <summary>Busca um tutor pelo CPF.</summary>
+            <remarks>O CPF deve ser informado sem pontos ou traços.</remarks>
+            <param name="cpf">CPF do tutor.</param>
+            <returns>Tutor encontrado ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TutoresController.Create(VetiWebApplication.Models.TutorRequest)">
+             <summary>Cadastra um novo tutor.</summary>
+             <remarks>
+             Exemplo de requisição:
+            
+                 POST /api/tutor
+                 {
+                     "nmTutor": "Laura Lopes",
+                     "dsCpf": "12345678901",
+                     "dsEmail": "laura@email.com",
+                     "dsTelefone": "11999999999"
+                 }
+             </remarks>
+             <returns>Tutor criado com status 201.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TutoresController.Update(System.Int32,VetiWebApplication.Models.TutorRequest)">
+            <summary>Atualiza os dados de um tutor.</summary>
+            <remarks>Todos os campos serão substituídos pelos novos valores informados.</remarks>
+            <param name="id">ID do tutor a ser atualizado.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.TutoresController.Delete(System.Int32)">
+            <summary>Remove um tutor pelo ID.</summary>
+            <remarks>A remoção é permanente e não pode ser desfeita.</remarks>
+            <param name="id">ID do tutor a ser removido.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.VeterinariosController.GetAll">
+            <summary>Lista todos os veterinários cadastrados.</summary>
+            <returns>Lista de veterinários.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.VeterinariosController.GetById(System.Int32)">
+            <summary>Busca um veterinário pelo ID.</summary>
+            <param name="id">ID do veterinário.</param>
+            <returns>Veterinário encontrado ou 404.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.VeterinariosController.Create(VetiWebApplication.Models.VeterinarioRequest)">
+             <summary>Cadastra um novo veterinário.</summary>
+             <remarks>
+             Exemplo de requisição:
+            
+                 POST /api/veterinario
+                 {
+                     "dsEmail": "vet@clinica.com",
+                     "dsPassword": "123456"
+                 }
+             </remarks>
+             <returns>Veterinário criado com status 201.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.VeterinariosController.Update(System.Int32,VetiWebApplication.Models.VeterinarioRequest)">
+            <summary>Atualiza os dados de um veterinário.</summary>
+            <param name="id">ID do veterinário a ser atualizado.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="M:VetiWebApplication.Controllers.VeterinariosController.Delete(System.Int32)">
+            <summary>Remove um veterinário pelo ID.</summary>
+            <param name="id">ID do veterinário a ser removido.</param>
+            <returns>204 em caso de sucesso ou 404 se não encontrado.</returns>
+        </member>
+        <member name="T:VetiWebApplication.Migrations.InitialCreate">
+            <inheritdoc />
+        </member>
+        <member name="M:VetiWebApplication.Migrations.InitialCreate.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:VetiWebApplication.Migrations.InitialCreate.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:VetiWebApplication.Migrations.InitialCreate.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:VetiWebApplication.Migrations.UpdateDateConsulta">
+            <inheritdoc />
+        </member>
+        <member name="M:VetiWebApplication.Migrations.UpdateDateConsulta.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:VetiWebApplication.Migrations.UpdateDateConsulta.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:VetiWebApplication.Migrations.UpdateDateConsulta.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:VetiWebApplication.Migrations.AddTratamento">
+            <inheritdoc />
+        </member>
+        <member name="M:VetiWebApplication.Migrations.AddTratamento.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:VetiWebApplication.Migrations.AddTratamento.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:VetiWebApplication.Migrations.AddTratamento.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="P:VetiWebApplication.Models.Pet.StCastrado">
+            <summary>
+            Indica se o pet é castrado.
+            1 = castrado, 0 = não castrado
+            </summary>
+        </member>
+        <member name="T:Program">
+            <summary>
+            Auto-generated public partial Program class for top-level statement apps.
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Type)">
+            <summary>
+            Generates a documentation comment ID for a type.
+            Example: T:Namespace.Outer+Inner`1 becomes T:Namespace.Outer.Inner`1
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Reflection.PropertyInfo)">
+            <summary>
+            Generates a documentation comment ID for a property.
+            Example: P:Namespace.ContainingType.PropertyName or for an indexer P:Namespace.ContainingType.Item(System.Int32)
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Type,System.String)">
+            <summary>
+            Generates a documentation comment ID for a property given its container type and property name.
+            Example: P:Namespace.ContainingType.PropertyName
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Reflection.MethodInfo)">
+            <summary>
+            Generates a documentation comment ID for a method (or constructor).
+            For example:
+              M:Namespace.ContainingType.MethodName(ParamType1,ParamType2)~ReturnType
+              M:Namespace.ContainingType.#ctor(ParamType)
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.GetTypeDocId(System.Type,System.Boolean,System.Boolean)">
+            <summary>
+            Generates a documentation ID string for a type.
+            This method handles nested types (replacing '+' with '.'),
+            generic types, arrays, pointers, by-ref types, and generic parameters.
+            The <paramref name="includeGenericArguments"/> flag controls whether
+            constructed generic type arguments are emitted, while <paramref name="omitGenericArity"/>
+            controls whether the generic arity marker (e.g. "`1") is appended.
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.NormalizeDocId(System.String)">
+            <summary>
+            Normalizes a documentation comment ID to match the compiler-style format.
+            Strips the return type suffix for ordinary methods but retains it for conversion operators.
+            </summary>
+            <param name="docId">The documentation comment ID to normalize.</param>
+            <returns>The normalized documentation comment ID.</returns>
+        </member>
+    </members>
+</doc>
