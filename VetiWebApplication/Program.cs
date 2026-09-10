@@ -1,11 +1,41 @@
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
+using Serilog;
 using VetiWebApplication.Data;
+using VetiWebApplication.HealthChecks;
 using VetiWebApplication.Interfaces;
 using VetiWebApplication.Repositories;
 using VetiWebApplication.Services;
 
+
+// Configuração do Serilog: define onde e como os logs serão gravados.
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information() // Nível mínimo: Information, Warning, Error
+    .WriteTo.Console() // Mostra os logs no terminal
+    .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day) // Salva em arquivo, um por dia
+    .Enrich.FromLogContext() // Permite enriquecer os logs com dados extras (usado para correlação de requisições)
+    .CreateLogger();
+
 var builder = WebApplication.CreateBuilder(args);
+
+// OpenTelemetry: Tracing (rastreia o caminho de cada requisição)
+// e Métricas (tempo de resposta, contagem de requisições, taxa de erros).
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing.AddAspNetCoreInstrumentation(); // Rastreia cada requisição HTTP recebida pela API
+        tracing.AddConsoleExporter(); // Exibe o rastreamento no terminal
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics.AddAspNetCoreInstrumentation(); // Métricas de requisições HTTP (duração, contagem, status code)
+        metrics.AddConsoleExporter(); // Exibe as métricas no terminal
+    });
+
+// Substitui o sistema de logging padrão do ASP.NET Core pelo Serilog
+builder.Host.UseSerilog();
 
 var connectionString = builder.Configuration.GetConnectionString("OracleConnection");
 
@@ -52,7 +82,16 @@ builder.Services.AddScoped<ITratamentoRepository, TratamentoRepository>();
 builder.Services.AddScoped<ITratamentoMedicamentoRepository, TratamentoMedicamentoRepository>();
 builder.Services.AddScoped<TratamentoService>();
 
+
+// Health Checks: verifica se a API está de pé E se consegue conectar no Oracle.
+builder.Services.AddHealthChecks()
+    .AddCheck<OracleHealthCheck>("oracle-database", tags: new[] { "db", "oracle" });
+
 var app = builder.Build();
+
+// Loga automaticamente cada requisição HTTP: método, rota, status code e tempo de resposta.
+// Isso também gera um identificador que permite correlacionar todos os logs de uma mesma requisição.
+app.UseSerilogRequestLogging();
 
 if (app.Environment.IsDevelopment())
 {
@@ -65,4 +104,18 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
-app.Run();
+app.MapHealthChecks("/health");
+
+try
+{
+    Log.Information("Iniciando a aplicação Veti...");
+    app.Run();
+}
+catch (Exception excecao)
+{
+    Log.Fatal(excecao, "A aplicação encerrou inesperadamente.");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
