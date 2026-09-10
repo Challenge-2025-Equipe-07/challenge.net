@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VetiWebApplication.Data;
-using VetiWebApplication.Models;
+using VetiWebApplication.Models.Requests;
+using VetiWebApplication.Services;
 
 namespace VetiWebApplication.Controllers
 {
@@ -9,10 +10,18 @@ namespace VetiWebApplication.Controllers
     [Route("api/pet")]
     public class PetsController : ControllerBase
     {
-        private readonly AppDbContext dbContext;
-        public PetsController(AppDbContext _dbContext) 
+
+        // Declara o serviço responsável pelas operações relacionadas aos pets.
+        private readonly PetService dbService;
+
+        // Declara o logger utilizado para registrar informações e erros do controller.
+        private readonly ILogger<PetsController> dbLogger;
+
+        // Construtor que recebe o serviço de pets e o logger por injeção de dependência.
+        public PetsController(PetService service, ILogger<PetsController> logger) 
         { 
-            dbContext = _dbContext; 
+            dbService = service;
+            dbLogger = logger;
         }
 
         /// <summary>Lista todos os pets cadastrados.</summary>
@@ -21,7 +30,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var pets = await dbContext.Pets.ToListAsync();
+            var pets = await dbService.ObterTodosAsync();
             return Ok(pets);
         }
 
@@ -31,7 +40,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var pet = await dbContext.Pets.Include(p => p.Tutor).FirstOrDefaultAsync(p => p.Id == id);
+            var pet = await dbService.ObterPorIdAsync(id);
             if (pet == null) return NotFound("Pet não encontrado.");
             return Ok(new
             {
@@ -57,7 +66,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("tutor/{tutorId}")]
         public async Task<IActionResult> GetByTutor(int tutorId)
         {
-            var pets = await dbContext.Pets.Include(p => p.Tutor).Where(p => p.TutorId == tutorId).ToListAsync();
+            var pets = await dbService.ObterPorTutorAsync(tutorId);
             if (!pets.Any()) return NotFound("Nenhum pet encontrado para este tutor.");
             return Ok(pets);
         }
@@ -69,7 +78,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("especie/{especie}")]
         public async Task<IActionResult> GetByEspecie(string especie)
         {
-            var pets = await dbContext.Pets.Include(p => p.Tutor).Where(p => p.DsEspecie.ToLower() == especie.ToLower()).ToListAsync();
+            var pets = await dbService.ObterPorEspecieAsync(especie);
             if (!pets.Any()) return NotFound("Nenhum pet encontrado para esta espécie.");
             return Ok(pets.Select(p => new
             {
@@ -108,31 +117,21 @@ namespace VetiWebApplication.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] PetRequest request)
         {
-            if (string.IsNullOrEmpty(request.NmPet))
-                return BadRequest("Nome do pet é obrigatório.");
-            if (string.IsNullOrEmpty(request.DsEspecie))
-                return BadRequest("Espécie é obrigatória.");
-            if (string.IsNullOrEmpty(request.DsRaca))
-                return BadRequest("Raça é obrigatória.");
-
-            // Valida se o tutor existe
-            var tutor = await dbContext.Tutores.FindAsync(request.TutorId);
-            if (tutor == null)
-                return NotFound($"Tutor com ID {request.TutorId} não encontrado.");
-
-            var pet = new Pet
+            try
             {
-                NmPet = request.NmPet,
-                DsEspecie = request.DsEspecie,
-                DsRaca = request.DsRaca,
-                NrIdade = request.NrIdade,
-                StCastrado = request.StCastrado,
-                TutorId = request.TutorId
-            };
-
-            dbContext.Pets.Add(pet);
-            await dbContext.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = pet.Id }, pet);
+                var pet = await dbService.CriarAsync(request);
+                return CreatedAtAction(nameof(GetById), new { id = pet.Id }, pet);
+            }
+            catch (ArgumentException excecao)
+            {
+                dbLogger.LogError(excecao, "Erro ao criar pet: {Mensagem}", excecao.Message);
+                return BadRequest(excecao.Message);
+            }
+            catch (KeyNotFoundException excecao)
+            {
+           
+                return NotFound(excecao.Message);
+            }
         }
 
         /// <summary>Atualiza os dados de um pet.</summary>
@@ -141,20 +140,11 @@ namespace VetiWebApplication.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] PetRequest petAtualizado)
         {
-            var pet = await dbContext.Pets.FindAsync(id);
-            if (pet == null) return NotFound("Pet não encontrado.");
+            var (sucesso, tutorNaoEncontrado) = await dbService.AtualizarAsync(id, petAtualizado);
 
-            var tutor = await dbContext.Tutores.FindAsync(petAtualizado.TutorId);
-            if (tutor == null) return NotFound($"Tutor com ID {petAtualizado.TutorId} não encontrado.");
+            if (tutorNaoEncontrado) return NotFound($"Tutor com ID {petAtualizado.TutorId} não encontrado.");
+            if (!sucesso) return NotFound("Pet não encontrado.");
 
-            pet.NmPet = petAtualizado.NmPet;
-            pet.DsEspecie = petAtualizado.DsEspecie;
-            pet.DsRaca = petAtualizado.DsRaca;
-            pet.NrIdade = petAtualizado.NrIdade;
-            pet.StCastrado = petAtualizado.StCastrado;
-            pet.TutorId = petAtualizado.TutorId;
-
-            await dbContext.SaveChangesAsync();
             return NoContent();
         }
 
@@ -164,11 +154,8 @@ namespace VetiWebApplication.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var pet = await dbContext.Pets.FindAsync(id);
-            if (pet == null) return NotFound("Pet não encontrado.");
-
-            dbContext.Pets.Remove(pet);
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.RemoverAsync(id);
+            if (!sucesso) return NotFound("Pet não encontrado.");
             return NoContent();
         }
     }

@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using VetiWebApplication.Data;
-using VetiWebApplication.Models;
+using VetiWebApplication.Models.Requests;
+using VetiWebApplication.Services;
 
 namespace VetiWebApplication.Controllers
 {
@@ -9,10 +8,18 @@ namespace VetiWebApplication.Controllers
     [Route("api/tutor")]
     public class TutoresController : ControllerBase
     {
-        private readonly AppDbContext dbContext;
-        public TutoresController(AppDbContext _dbContext) 
-        { 
-            dbContext = _dbContext; 
+
+        // Declara o serviço responsável pelas operações relacionadas aos tutores
+        private readonly TutorService dbService;
+
+        // Declara o logger utilizado para registrar informações e erros do controller
+        private readonly ILogger<TutoresController> dbLogger;
+
+        // Construtor que recebe o serviço de tutores e o logger por injeção de dependência
+        public TutoresController(TutorService service, ILogger<TutoresController> logger) 
+        {
+            dbService = service;
+            dbLogger = logger;
         }
 
         /// <summary>Lista todos os tutores cadastrados.</summary>
@@ -21,7 +28,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var tutores = await dbContext.Tutores.ToListAsync();
+            var tutores = await dbService.ObterTodosAsync();
             return Ok(tutores);
         }
 
@@ -32,7 +39,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var tutor = await dbContext.Tutores.Include(t => t.Pets).FirstOrDefaultAsync(t => t.Id == id);
+            var tutor = await dbService.ObterPorIdAsync(id);
             if (tutor == null) return NotFound("Tutor não encontrado.");
             return Ok(new
             {
@@ -60,7 +67,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("cpf/{cpf}")]
         public async Task<IActionResult> GetByCpf(string cpf)
         {
-            var tutor = await dbContext.Tutores.Include(t => t.Pets).FirstOrDefaultAsync(t => t.DsCpf == cpf);
+            var tutor = await dbService.ObterPorCpfAsync(cpf);
             if (tutor == null) return NotFound("Tutor não encontrado.");
             return Ok(tutor);
         }
@@ -82,24 +89,17 @@ namespace VetiWebApplication.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] TutorRequest request)
         {
-            if (string.IsNullOrEmpty(request.NmTutor))
-                return BadRequest("Nome é obrigatório.");
-            if (string.IsNullOrEmpty(request.DsCpf))
-                return BadRequest("CPF é obrigatório.");
-            if (string.IsNullOrEmpty(request.DsTelefone))
-                return BadRequest("Telefone é obrigatório.");
-
-            var tutor = new Tutor
+            try
             {
-                NmTutor = request.NmTutor,
-                DsCpf = request.DsCpf,
-                DsEmail = request.DsEmail,
-                DsTelefone = request.DsTelefone
-            };
-
-            dbContext.Tutores.Add(tutor);
-            await dbContext.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = tutor.Id }, tutor);
+                var tutor = await dbService.CriarAsync(request);
+                return CreatedAtAction(nameof(GetById), new { id = tutor.Id }, tutor);
+            }
+            catch (ArgumentException excecao)
+            {
+                dbLogger.LogError(excecao, "Erro ao criar tutor: {Mensagem}", excecao.Message);
+                return BadRequest(excecao.Message);
+            }
+            
         }
 
         /// <summary>Atualiza os dados de um tutor.</summary>
@@ -109,15 +109,8 @@ namespace VetiWebApplication.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] TutorRequest tutorAtualizado)
         {
-            var tutor = await dbContext.Tutores.FindAsync(id);
-            if (tutor == null) return NotFound("Tutor não encontrado.");
-
-            tutor.NmTutor = tutorAtualizado.NmTutor;
-            tutor.DsCpf = tutorAtualizado.DsCpf;
-            tutor.DsEmail = tutorAtualizado.DsEmail;
-            tutor.DsTelefone = tutorAtualizado.DsTelefone;
-
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.AtualizarAsync(id, tutorAtualizado);
+            if (!sucesso) return NotFound("Tutor não encontrado.");
             return NoContent();
         }
 
@@ -128,11 +121,8 @@ namespace VetiWebApplication.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var tutor = await dbContext.Tutores.FindAsync(id);
-            if (tutor == null) return NotFound("Tutor não encontrado.");
-
-            dbContext.Tutores.Remove(tutor);
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.RemoverAsync(id);
+            if (!sucesso) return NotFound("Tutor não encontrado.");
             return NoContent();
         }
     }

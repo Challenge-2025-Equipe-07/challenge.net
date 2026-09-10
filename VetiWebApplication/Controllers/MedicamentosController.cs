@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VetiWebApplication.Data;
-using VetiWebApplication.Models;
+using VetiWebApplication.Models.Requests;
+using VetiWebApplication.Services;
 
 namespace VetiWebApplication.Controllers
 {
@@ -9,15 +10,20 @@ namespace VetiWebApplication.Controllers
     [Route("api/medicamento")]
     public class MedicamentosController : ControllerBase
     {
-        private readonly AppDbContext dbContext;
-        public MedicamentosController(AppDbContext _dbContext) { dbContext = _dbContext; }
+        private readonly MedicamentoService dbService;
+        private readonly ILogger<MedicamentosController> dbLogger;
+        public MedicamentosController(MedicamentoService service, ILogger<MedicamentosController> logger) 
+        {
+            dbService = service;
+            dbLogger = logger;
+        }
 
         /// <summary>Lista todos os medicamentos cadastrados.</summary>
         /// <returns>Lista de medicamentos.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var medicamentos = await dbContext.Medicamentos.ToListAsync();
+            var medicamentos = await dbService.ObterTodosAsync();
             return Ok(medicamentos.Select(m => new
             {
                 m.Id,
@@ -33,7 +39,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var medicamento = await dbContext.Medicamentos.FindAsync(id);
+            var medicamento = await dbService.ObterPorIdAsync(id);
             if (medicamento == null) return NotFound("Medicamento não encontrado.");
 
             return Ok(new
@@ -60,30 +66,22 @@ namespace VetiWebApplication.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] MedicamentoRequest request)
         {
-            if (string.IsNullOrEmpty(request.NmMedicamento))
-                return BadRequest("Nome do medicamento é obrigatório.");
-            if (string.IsNullOrEmpty(request.DsDosagem))
-                return BadRequest("Dosagem é obrigatória.");
-            if (string.IsNullOrEmpty(request.DsFrequencia))
-                return BadRequest("Frequência é obrigatória.");
-
-            var medicamento = new Medicamento
+            try
             {
-                NmMedicamento = request.NmMedicamento,
-                DsDosagem = request.DsDosagem,
-                DsFrequencia = request.DsFrequencia
-            };
-
-            dbContext.Medicamentos.Add(medicamento);
-            await dbContext.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = medicamento.Id }, new
+                var medicamento = await dbService.CriarAsync(request);
+                return CreatedAtAction(nameof(GetById), new { id = medicamento.Id }, new
+                {
+                    medicamento.Id,
+                    medicamento.NmMedicamento,
+                    medicamento.DsDosagem,
+                    medicamento.DsFrequencia
+                });
+            }
+            catch (ArgumentException excecao)
             {
-                medicamento.Id,
-                medicamento.NmMedicamento,
-                medicamento.DsDosagem,
-                medicamento.DsFrequencia
-            });
+                dbLogger.LogError(excecao, "Erro ao criar medicamento: {Mensagem}", excecao.Message);
+                return BadRequest(excecao.Message);
+            }
         }
 
         /// <summary>Atualiza os dados de um medicamento.</summary>
@@ -92,14 +90,8 @@ namespace VetiWebApplication.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] MedicamentoRequest request)
         {
-            var medicamento = await dbContext.Medicamentos.FindAsync(id);
-            if (medicamento == null) return NotFound("Medicamento não encontrado.");
-
-            medicamento.NmMedicamento = request.NmMedicamento;
-            medicamento.DsDosagem = request.DsDosagem;
-            medicamento.DsFrequencia = request.DsFrequencia;
-
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.AtualizarAsync(id, request);
+            if (!sucesso) return NotFound("Medicamento não encontrado.");
             return NoContent();
         }
 
@@ -109,11 +101,8 @@ namespace VetiWebApplication.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var medicamento = await dbContext.Medicamentos.FindAsync(id);
-            if (medicamento == null) return NotFound("Medicamento não encontrado.");
-
-            dbContext.Medicamentos.Remove(medicamento);
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.RemoverAsync(id);
+            if (!sucesso) return NotFound("Medicamento não encontrado.");
             return NoContent();
         }
     }

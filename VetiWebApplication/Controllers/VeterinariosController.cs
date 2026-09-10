@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VetiWebApplication.Data;
-using VetiWebApplication.Models;
+using VetiWebApplication.Models.Requests;
+using VetiWebApplication.Services;
 
 namespace VetiWebApplication.Controllers
 {
@@ -9,10 +10,19 @@ namespace VetiWebApplication.Controllers
     [Route("api/veterinario")]
     public class VeterinariosController : ControllerBase
     {
-        private readonly AppDbContext dbContext;
-        public VeterinariosController(AppDbContext _dbContext) 
+
+
+        // Declara o serviço responsável pelas operações relacionadas aos veterinários.
+        private readonly VeterinarioService dbService;
+
+        // Declara o logger utilizado para registrar informações e erros do controller.
+        private readonly ILogger<VeterinariosController> dbLogger;
+
+        // Construtor que recebe o serviço de veterinários e o logger por injeção de dependência.
+        public VeterinariosController(VeterinarioService service, ILogger<VeterinariosController> logger) 
         { 
-            dbContext = _dbContext; 
+            dbService = service;
+            dbLogger = logger;
         }
 
         /// <summary>Lista todos os veterinários cadastrados.</summary>
@@ -20,7 +30,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var vets = await dbContext.Veterinarios.ToListAsync();
+            var vets = await dbService.ObterTodosAsync();
             return Ok(vets);
         }
 
@@ -30,7 +40,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var vet = await dbContext.Veterinarios.FindAsync(id);
+            var vet = await dbService.ObterPorIdAsync(id);
             if (vet == null) return NotFound("Veterinário não encontrado.");
             return Ok(vet);
         }
@@ -49,20 +59,16 @@ namespace VetiWebApplication.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] VeterinarioRequest request)
         {
-            if (string.IsNullOrEmpty(request.DsEmail))
-                return BadRequest("Email é obrigatório.");
-            if (string.IsNullOrEmpty(request.DsPassword))
-                return BadRequest("Senha é obrigatória.");
-
-            var vet = new Veterinario
+            try
             {
-                DsEmail = request.DsEmail,
-                DsPassword = request.DsPassword
-            };
-
-            dbContext.Veterinarios.Add(vet);
-            await dbContext.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = vet.Id }, vet);
+                var vet = await dbService.CriarAsync(request);
+                return CreatedAtAction(nameof(GetById), new { id = vet.Id }, vet);
+            }
+            catch (ArgumentException excecao)
+            {
+                dbLogger.LogError(excecao, "Erro ao criar veterinário: {Mensagem}", excecao.Message);
+                return BadRequest(excecao.Message);
+            }
         }
 
         /// <summary>Atualiza os dados de um veterinário.</summary>
@@ -71,13 +77,8 @@ namespace VetiWebApplication.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] VeterinarioRequest vetAtualizado)
         {
-            var vet = await dbContext.Veterinarios.FindAsync(id);
-            if (vet == null) return NotFound("Veterinário não encontrado.");
-
-            vet.DsEmail = vetAtualizado.DsEmail;
-            vet.DsPassword = vetAtualizado.DsPassword;
-
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.AtualizarAsync(id, vetAtualizado);
+            if (!sucesso) return NotFound("Veterinário não encontrado.");
             return NoContent();
         }
 
@@ -87,11 +88,8 @@ namespace VetiWebApplication.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var vet = await dbContext.Veterinarios.FindAsync(id);
-            if (vet == null) return NotFound("Veterinário não encontrado.");
-
-            dbContext.Veterinarios.Remove(vet);
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.RemoverAsync(id);
+            if (!sucesso) return NotFound("Veterinário não encontrado.");
             return NoContent();
         }
     }

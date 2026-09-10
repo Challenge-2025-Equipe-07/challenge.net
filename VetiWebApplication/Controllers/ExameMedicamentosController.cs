@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using VetiWebApplication.Data;
-using VetiWebApplication.Models;
+using VetiWebApplication.Models.Requests;
+using VetiWebApplication.Services;
 
 namespace VetiWebApplication.Controllers
 {
@@ -9,10 +8,12 @@ namespace VetiWebApplication.Controllers
     [Route("api/exame-medicamento")]
     public class ExameMedicamentosController : ControllerBase
     {
-        private readonly AppDbContext dbContext;
-        public ExameMedicamentosController(AppDbContext _dbContext) 
-        { 
-            dbContext = _dbContext; 
+        private readonly ExameMedicamentoService dbService;
+        private readonly ILogger<ExameMedicamentosController> dbLogger;
+        public ExameMedicamentosController(ExameMedicamentoService service, ILogger<ExameMedicamentosController> logger) 
+        {
+            dbService = service;
+            dbLogger = logger;
         }
 
         /// <summary>Lista todos os medicamentos vinculados a exames.</summary>
@@ -20,11 +21,8 @@ namespace VetiWebApplication.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var lista = await dbContext.ExameMedicamentos
-                .Include(em => em.Exame)
-                .Include(em => em.Medicamento)
-                .ToListAsync();
-
+            var lista = await dbService.ObterTodosAsync();
+          
             return Ok(lista.Select(em => new
             {
                 exame = new
@@ -50,14 +48,8 @@ namespace VetiWebApplication.Controllers
         [HttpGet("exame/{exameId}")]
         public async Task<IActionResult> GetByExame(int exameId)
         {
-            var exame = await dbContext.Exames.FindAsync(exameId);
-            if (exame == null) return NotFound("Exame não encontrado.");
-
-            var lista = await dbContext.ExameMedicamentos
-                .Include(em => em.Medicamento)
-                .Where(em => em.ExameId == exameId)
-                .ToListAsync();
-
+            var (exameExiste, lista) = await dbService.ObterPorExameAsync(exameId);
+            if (!exameExiste) return NotFound("Exame não encontrado.");
             if (!lista.Any()) return NotFound("Nenhum medicamento encontrado para este exame.");
 
             return Ok(lista.Select(em => new
@@ -76,14 +68,8 @@ namespace VetiWebApplication.Controllers
         [HttpGet("medicamento/{medicamentoId}")]
         public async Task<IActionResult> GetByMedicamento(int medicamentoId)
         {
-            var medicamento = await dbContext.Medicamentos.FindAsync(medicamentoId);
-            if (medicamento == null) return NotFound("Medicamento não encontrado.");
-
-            var lista = await dbContext.ExameMedicamentos
-                .Include(em => em.Exame)
-                .Where(em => em.MedicamentoId == medicamentoId)
-                .ToListAsync();
-
+            var (medicamentoExiste, lista) = await dbService.ObterPorMedicamentoAsync(medicamentoId);
+            if (!medicamentoExiste) return NotFound("Medicamento não encontrado.");
             if (!lista.Any()) return NotFound("Nenhum exame encontrado para este medicamento.");
 
             return Ok(lista.Select(em => new
@@ -111,32 +97,25 @@ namespace VetiWebApplication.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] ExameMedicamentoRequest request)
         {
-            var exame = await dbContext.Exames.FindAsync(request.ExameId);
-            if (exame == null) return NotFound($"Exame com ID {request.ExameId} não encontrado.");
-
-            var medicamento = await dbContext.Medicamentos.FindAsync(request.MedicamentoId);
-            if (medicamento == null) return NotFound($"Medicamento com ID {request.MedicamentoId} não encontrado.");
-
-            var jaExiste = await dbContext.ExameMedicamentos
-                .AnyAsync(em => em.ExameId == request.ExameId && em.MedicamentoId == request.MedicamentoId);
-            if (jaExiste) return BadRequest("Este medicamento já está vinculado a este exame.");
-
-            var exameMedicamento = new ExameMedicamento
+            try
             {
-                ExameId = request.ExameId,
-                MedicamentoId = request.MedicamentoId,
-                QtMedicamento = request.QtMedicamento
-            };
-
-            dbContext.ExameMedicamentos.Add(exameMedicamento);
-            await dbContext.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetByExame), new { exameId = request.ExameId }, new
+                var criado = await dbService.CriarAsync(request);
+                return CreatedAtAction(nameof(GetByExame), new { exameId = request.ExameId }, new
+                {
+                    request.ExameId,
+                    request.MedicamentoId,
+                    request.QtMedicamento
+                });
+            }
+            catch (KeyNotFoundException excecao)
             {
-                request.ExameId,
-                request.MedicamentoId,
-                request.QtMedicamento
-            });
+                return NotFound(excecao.Message);
+            }
+            catch (InvalidOperationException excecao)
+            {
+                dbLogger.LogWarning(excecao, "Erro ao vincular medicamento a exame.");
+                return BadRequest(excecao.Message);
+            }
         }
 
         /// <summary>Remove a relação entre um exame e um medicamento.</summary>
@@ -146,13 +125,8 @@ namespace VetiWebApplication.Controllers
         [HttpDelete("{exameId}/{medicamentoId}")]
         public async Task<IActionResult> Delete(int exameId, int medicamentoId)
         {
-            var exameMedicamento = await dbContext.ExameMedicamentos
-                .FirstOrDefaultAsync(em => em.ExameId == exameId && em.MedicamentoId == medicamentoId);
-
-            if (exameMedicamento == null) return NotFound("Relação não encontrada.");
-
-            dbContext.ExameMedicamentos.Remove(exameMedicamento);
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.RemoverAsync(exameId, medicamentoId);
+            if (!sucesso) return NotFound("Relação não encontrada.");
             return NoContent();
         }
     }

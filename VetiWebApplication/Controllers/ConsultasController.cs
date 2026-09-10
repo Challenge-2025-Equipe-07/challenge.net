@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using VetiWebApplication.Data;
-using VetiWebApplication.Models;
+using VetiWebApplication.Models.Requests;
+using VetiWebApplication.Services;
 
 namespace VetiWebApplication.Controllers
 {
@@ -9,10 +8,12 @@ namespace VetiWebApplication.Controllers
     [Route("api/consulta")]
     public class ConsultasController : ControllerBase
     {
-        private readonly AppDbContext dbContext;
-        public ConsultasController(AppDbContext _dbContext) 
-        { 
-            dbContext = _dbContext; 
+        private readonly ConsultaService dbService;
+        private readonly ILogger<ConsultasController> dbLogger;
+        public ConsultasController(ConsultaService service, ILogger<ConsultasController> logger) 
+        {
+            dbService = service;
+            dbLogger = logger;
         }
 
         /// <summary>Lista todas as consultas cadastradas.</summary>
@@ -21,9 +22,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var consultas = await dbContext.Consultas
-                .Include(c => c.Pet)
-                .Include(c => c.Veterinario).ToListAsync();
+            var consultas = await dbService.ObterTodasAsync();
             return Ok(consultas.Select(c => new
             {
                 c.Id,
@@ -50,10 +49,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var consulta = await dbContext.Consultas
-                .Include(c => c.Pet).ThenInclude(p => p.Tutor)
-                .Include(c => c.Veterinario)
-                .FirstOrDefaultAsync(c => c.Id == id);
+            var consulta = await dbService.ObterPorIdAsync(id);
             if (consulta == null) return NotFound("Consulta não encontrada.");
             return Ok(new
             {
@@ -87,11 +83,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("pet/{petId}")]
         public async Task<IActionResult> GetByPet(int petId)
         {
-            var consultas = await dbContext.Consultas
-                .Include(c => c.Pet)
-                .Include(c => c.Veterinario)
-                .Where(c => c.PetId == petId)
-                .ToListAsync();
+            var consultas = await dbService.ObterPorPetAsync(petId);
             if (!consultas.Any()) return NotFound("Nenhuma consulta encontrada para este pet.");
             return Ok(consultas.Select(c => new
             {
@@ -128,31 +120,20 @@ namespace VetiWebApplication.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] ConsultaRequest request)
         {
-            if (string.IsNullOrEmpty(request.TpEvento))
-                return BadRequest("Tipo do evento é obrigatório.");
-
-            // Valida se o pet existe
-            var pet = await dbContext.Pets.FindAsync(request.PetId);
-            if (pet == null)
-                return NotFound($"Pet com ID {request.PetId} não encontrado.");
-
-            // Valida se o veterinário existe
-            var vet = await dbContext.Veterinarios.FindAsync(request.VeterinarioId);
-            if (vet == null)
-                return NotFound($"Veterinário com ID {request.VeterinarioId} não encontrado.");
-
-            var consulta = new Consulta
+            try
             {
-                DtConsulta = request.DtConsulta,
-                TpEvento = request.TpEvento,
-                Notificar = request.Notificar,
-                PetId = request.PetId,
-                VeterinarioId = request.VeterinarioId
-            };
-
-            dbContext.Consultas.Add(consulta);
-            await dbContext.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = consulta.Id }, consulta);
+                var consulta = await dbService.CriarAsync(request);
+                return CreatedAtAction(nameof(GetById), new { id = consulta.Id }, consulta);
+            }
+            catch (ArgumentException excecao)
+            {
+                dbLogger.LogError(excecao, "Erro ao criar consulta: {Mensagem}", excecao.Message);
+                return BadRequest(excecao.Message);
+            }
+            catch (KeyNotFoundException excecao)
+            {
+                return NotFound(excecao.Message);
+            }
         }
 
         /// <summary>Atualiza os dados de uma consulta.</summary>
@@ -161,19 +142,11 @@ namespace VetiWebApplication.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] ConsultaRequest consultaAtualizada)
         {
-            var consulta = await dbContext.Consultas.FindAsync(id);
-            if (consulta == null) return NotFound("Consulta não encontrada.");
+            var (sucesso, vetNaoEncontrado) = await dbService.AtualizarAsync(id, consultaAtualizada);
 
-            var vet = await dbContext.Veterinarios.FindAsync(consultaAtualizada.VeterinarioId);
-            if (vet == null) return NotFound($"Veterinário com ID {consultaAtualizada.VeterinarioId} não encontrado.");
+            if (vetNaoEncontrado) return NotFound($"Veterinário com ID {consultaAtualizada.VeterinarioId} não encontrado.");
+            if (!sucesso) return NotFound("Consulta não encontrada.");
 
-            consulta.DtConsulta = consultaAtualizada.DtConsulta;
-            consulta.TpEvento = consultaAtualizada.TpEvento;
-            consulta.Notificar = consultaAtualizada.Notificar;
-            consulta.PetId = consultaAtualizada.PetId;
-            consulta.VeterinarioId = consultaAtualizada.VeterinarioId;
-
-            await dbContext.SaveChangesAsync();
             return NoContent();
         }
 
@@ -183,11 +156,9 @@ namespace VetiWebApplication.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var consulta = await dbContext.Consultas.FindAsync(id);
-            if (consulta == null) return NotFound("Consulta não encontrada.");
+            var sucesso = await dbService.RemoverAsync(id);
+            if (!sucesso) return NotFound("Consulta não encontrada.");
 
-            dbContext.Consultas.Remove(consulta);
-            await dbContext.SaveChangesAsync();
             return NoContent();
         }
     }

@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VetiWebApplication.Data;
-using VetiWebApplication.Models;
+using VetiWebApplication.Models.Requests;
+using VetiWebApplication.Services;
 
 namespace VetiWebApplication.Controllers
 {
@@ -9,10 +10,12 @@ namespace VetiWebApplication.Controllers
     [Route("api/exames")]
     public class ExamesController : ControllerBase
     {
-        private readonly AppDbContext dbContext;
-        public ExamesController(AppDbContext _dbContext) 
-        { 
-            dbContext = _dbContext; 
+        private readonly ExameService dbService;
+        private readonly ILogger<ExamesController> dbLogger;
+        public ExamesController(ExameService service, ILogger<ExamesController> logger) 
+        {
+            dbService = service;
+            dbLogger = logger;
         }
 
         /// <summary>Lista todos os exames cadastrados.</summary>
@@ -20,7 +23,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var exames = await dbContext.Exames.Include(e => e.Consulta).ToListAsync();
+            var exames = await dbService.ObterTodosAsync();
             return Ok(exames.Select(e => new
             {
                 e.Id,
@@ -43,7 +46,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var exame = await dbContext.Exames.Include(e => e.Consulta).FirstOrDefaultAsync(e => e.Id == id);
+            var exame = await dbService.ObterPorIdAsync(id);
             if (exame == null) return NotFound("Exame não encontrado.");
             return Ok(new
             {
@@ -69,15 +72,10 @@ namespace VetiWebApplication.Controllers
         public async Task<IActionResult> GetByTutor(int tutorId)
         {
             // Valida se o tutor existe
-            var tutor = await dbContext.Tutores.FindAsync(tutorId);
-            if (tutor == null) return NotFound("Tutor não encontrado.");
-
-            var exames = await dbContext.Exames
-                .Include(e => e.Consulta).ThenInclude(c => c.Pet)
-                .Where(e => e.Consulta.Pet.TutorId == tutorId)
-                .ToListAsync();
-
+            var (tutorExiste, exames) = await dbService.ObterPorTutorAsync(tutorId);
+            if (!tutorExiste) return NotFound("Tutor não encontrado.");
             if (!exames.Any()) return NotFound("Nenhum exame encontrado para este tutor.");
+
             return Ok(exames.Select(e => new
             {
                 e.Id,
@@ -105,15 +103,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("pet/{petId}")]
         public async Task<IActionResult> GetByPet(int petId)
         {
-            // Valida se o pet existe
-            var pet = await dbContext.Pets.FindAsync(petId);
-            if (pet == null) return NotFound("Pet não encontrado.");
-          
-            var exames = await dbContext.Exames
-                .Include(e => e.Consulta).ThenInclude(c => c.Pet)
-                .Where(e => e.Consulta.Pet.Id == petId)
-                .ToListAsync();
-
+            var exames = await dbService.ObterPorPetAsync(petId);
             if (!exames.Any()) return NotFound("Nenhum exame encontrado para este pet.");
             return Ok(exames.Select(e => new
             {
@@ -131,7 +121,7 @@ namespace VetiWebApplication.Controllers
         [HttpGet("consulta/{consultaId}")]
         public async Task<IActionResult> GetByConsulta(int consultaId)
         {
-            var exames = await dbContext.Exames.Where(e => e.ConsultaId == consultaId).ToListAsync();
+            var exames = await dbService.ObterPorConsultaAsync(consultaId);
             if (!exames.Any()) return NotFound("Nenhum exame encontrado para esta consulta.");
 
             return Ok(exames.Select(e => new
@@ -159,34 +149,27 @@ namespace VetiWebApplication.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] ExameRequest request)
         {
-            if (string.IsNullOrEmpty(request.DsDocumento))
-                return BadRequest("Documento é obrigatório.");
-            if (string.IsNullOrEmpty(request.DsDiagnostico))
-                return BadRequest("Diagnóstico é obrigatório.");
-
-            // Valida se a consulta existe
-            var consulta = await dbContext.Consultas.FindAsync(request.ConsultaId);
-            if (consulta == null)
-                return NotFound($"Consulta com ID {request.ConsultaId} não encontrada.");
-
-            var exame = new Exame
+            try
             {
-                DsDocumento = request.DsDocumento,
-                DtRealizacao = request.DtRealizacao,
-                DsDiagnostico = request.DsDiagnostico,
-                ConsultaId = request.ConsultaId
-            };
-
-            dbContext.Exames.Add(exame);
-            await dbContext.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = exame.Id }, new
+                var exame = await dbService.CriarAsync(request);
+                return CreatedAtAction(nameof(GetById), new { id = exame.Id }, new
+                {
+                    exame.Id,
+                    exame.DsDocumento,
+                    exame.DtRealizacao,
+                    exame.DsDiagnostico,
+                    exame.ConsultaId
+                });
+            }
+            catch (ArgumentException excecao)
             {
-                exame.Id,
-                exame.DsDocumento,
-                exame.DtRealizacao,
-                exame.DsDiagnostico,
-                exame.ConsultaId
-            });
+                dbLogger.LogError(excecao, "Erro ao criar exame: {Mensagem}", excecao.Message);
+                return BadRequest(excecao.Message);
+            }
+            catch (KeyNotFoundException excecao)
+            {
+                return NotFound(excecao.Message);
+            }
         }
 
         /// <summary>Atualiza os dados de um exame.</summary>
@@ -195,14 +178,8 @@ namespace VetiWebApplication.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] ExameRequest exameAtualizado)
         {
-            var exame = await dbContext.Exames.FindAsync(id);
-            if (exame == null) return NotFound("Exame não encontrado.");
-
-            exame.DsDocumento = exameAtualizado.DsDocumento;
-            exame.DtRealizacao = exameAtualizado.DtRealizacao;
-            exame.DsDiagnostico = exameAtualizado.DsDiagnostico;
-
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.AtualizarAsync(id, exameAtualizado);
+            if (!sucesso) return NotFound("Exame não encontrado.");
             return NoContent();
         }
 
@@ -212,11 +189,8 @@ namespace VetiWebApplication.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var exame = await dbContext.Exames.FindAsync(id);
-            if (exame == null) return NotFound("Exame não encontrado.");
-
-            dbContext.Exames.Remove(exame);
-            await dbContext.SaveChangesAsync();
+            var sucesso = await dbService.RemoverAsync(id);
+            if (!sucesso) return NotFound("Exame não encontrado.");
             return NoContent();
         }
     }

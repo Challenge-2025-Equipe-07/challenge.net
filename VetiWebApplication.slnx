@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="VetiWebApplication.IntegrationTests/VetiWebApplication.IntegrationTests.csproj" Id="0e0421bf-5805-49f7-a067-a6dd47ab1664" />
+  <Project Path="VetiWebApplication.UnitTests/VetiWebApplication.UnitTests.csproj" Id="606d417c-39e1-43dc-87fb-6ad075a5d6f8" />
   <Project Path="VetiWebApplication/VetiWebApplication.csproj" />
 </Solution>
