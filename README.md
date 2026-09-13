@@ -2,6 +2,8 @@
 
 API RESTful desenvolvida em ASP.NET Core para gerenciamento de consultas, exames e tratamentos veterinários. O sistema permite que tutores acompanhem o histórico clínico de seus pets, enquanto veterinários cadastram consultas, exames e tratamentos com medicamentos associados.
 
+**Novidades da Sprint 2:** a aplicação agora conta com camadas de monitoramento e observabilidade (Health Checks, logging estruturado e tracing/métricas), além de testes automatizados (unitários e de integração) cobrindo as regras de negócio e os endpoints da API.
+
 ---
 
 ## 🛠️ Tecnologias Utilizadas
@@ -11,6 +13,10 @@ API RESTful desenvolvida em ASP.NET Core para gerenciamento de consultas, exames
 - **Oracle Database** — Banco de dados relacional
 - **Scalar** — Documentação interativa da API
 - **C#** — Linguagem de programação
+- **Serilog** — Logging estruturado
+- **OpenTelemetry** — Tracing distribuído e métricas de desempenho
+- **xUnit** — Framework de testes automatizados
+- **Moq** — Criação de mocks para testes unitários
 
 ---
 
@@ -18,13 +24,21 @@ API RESTful desenvolvida em ASP.NET Core para gerenciamento de consultas, exames
 
 | Pacote | Versão |
 |--------|--------|
-| Microsoft.AspNetCore.OpenApi | 10.0.7 |
+| Microsoft.AspNetCore.OpenApi | 10.0.8 |
 | Microsoft.EntityFrameworkCore | 10.0.8 |
 | Microsoft.EntityFrameworkCore.Design | 10.0.8 |
 | Microsoft.EntityFrameworkCore.Tools | 10.0.8 |
+| Microsoft.OpenApi | 2.7.5 |
 | Oracle.EntityFrameworkCore | 10.23.26200 |
 | Scalar.AspNetCore | 2.14.14 |
-| Swashbuckle.AspNetCore | 10.1.7 |
+| Serilog.AspNetCore | 10.0.0 |
+| Serilog.Sinks.Console | 6.1.1 |
+| Serilog.Sinks.File | 7.0.0 |
+| OpenTelemetry.Extensions.Hosting | 1.18.0 |
+| OpenTelemetry.Instrumentation.AspNetCore | 1.18.0 |
+| OpenTelemetry.Exporter.Console | 1.18.0 |
+
+
 
 ---
 
@@ -71,19 +85,17 @@ Abra o arquivo `appsettings.json` e preencha com suas credenciais Oracle:
 }
 ```
 
-**3. Instale os pacotes NuGet**
+**3. Restaure os pacotes NuGet**
 
-No Package Manager Console:
+No terminal, na pasta da solução:
 ```powershell
-Install-Package Microsoft.EntityFrameworkCore
-Install-Package Microsoft.EntityFrameworkCore.Design
-Install-Package Oracle.EntityFrameworkCore
-Install-Package Scalar.AspNetCore
+dotnet restore
 ```
 
 **4. Crie as tabelas no banco**
 
-No Package Manager Console:
+No Package Manager Console, com o projeto 
+`VetiWebApplication` selecionado:
 ```powershell
 Add-Migration InitialCreate
 Update-Database
@@ -93,7 +105,7 @@ Update-Database
 
 Pressione `F5` no Visual Studio ou execute:
 ```bash
-dotnet run
+dotnet run --project VetiWebApplication
 ```
 
 **6. Acesse a documentação**
@@ -101,6 +113,88 @@ dotnet run
 ```
 https://localhost:{porta}/scalar/v1
 ```
+---
+
+## 📊 Monitoramento e Observabilidade
+
+### Health Check
+
+A API expõe um endpoint de verificação de saúde que testa tanto a disponibilidade da aplicação quanto a conectividade real com o banco Oracle: 
+
+GET /health
+
+
+**Respostas possíveis:**
+- `Healthy` (200 OK) — API funcionando e conexão com o Oracle bem-sucedida.
+- `Unhealthy` (503 Service Unavailable) — a API está de pé, mas não conseguiu se conectar ao Oracle (ex: banco fora do ar, credenciais inválidas, rede indisponível).
+
+A verificação é feita por uma implementação customizada (`OracleHealthCheck`, em `HealthChecks/`), usando apenas o framework nativo `Microsoft.Extensions.Diagnostics.HealthChecks`. Ela tenta abrir uma conexão real com o banco (`Database.CanConnectAsync()`) a cada chamada ao endpoint.
+
+**Como monitorar manualmente:**
+```bash
+curl -i https://localhost:{porta}/health
+```
+A flag `-i` mostra o código de status HTTP retornado, junto com o corpo da resposta.
+
+### Logging Estruturado (Serilog)
+
+Todos os eventos da aplicação são registrados de forma estruturada, com os seguintes níveis: `Information`, `Warning` e `Error`.
+
+- **Console**: os logs aparecem em tempo real no terminal ao rodar a aplicação.
+- **Arquivo**: os logs também são salvos na pasta `Logs/`, na raiz do projeto, em arquivos diários (ex: `Logs/log-20260910.txt`).
+- **Correlação de requisições**: cada requisição HTTP é logada com método, rota, status code e tempo de resposta, através do middleware `UseSerilogRequestLogging()`, permitindo rastrear o ciclo completo de uma chamada.
+
+Exemplo de log de uma requisição:
+
+[16:30:42 INF] Request starting HTTP/2 GET https://localhost:7232/api/tutor - null null
+[16:30:44 INF] Executed DbCommand (97ms) [...] SELECT "t"."Id", "t"."DsCpf", ... FROM "TB_TUTOR" "t"
+[16:30:45 INF] HTTP GET /api/tutor responded 200 in 2194.0829 ms
+
+### Tracing e Métricas (OpenTelemetry)
+
+A aplicação usa OpenTelemetry para:
+- **Tracing**: rastrear cada requisição HTTP recebida, com duração e status code, exibido no console como blocos `Activity`.
+- **Métricas**: medir tempo de resposta (histograma por rota) e contagem de requisições, permitindo calcular taxa de erros (proporção de status 4xx/5xx sobre o total). Exibido no console como blocos `Metric Name`.
+
+Por padrão, tracing e métricas são exportados para o console (`AddConsoleExporter()`), útil para desenvolvimento e demonstração. Em um ambiente de produção, esses dados seriam enviados para uma ferramenta especializada (ex: Grafana, Jaeger, Application Insights).
+
+---
+
+## 🧪 Testes Automatizados
+
+O projeto conta com dois projetos de teste, organizados por camada:
+
+- **`VetiWebApplication.UnitTests`** — testa a camada de regra de negócio (Services), usando xUnit + Moq. As dependências (repositórios) são mockadas, sem tocar em banco de dados real.
+- **`VetiWebApplication.IntegrationTests`** — testa os endpoints da API de ponta a ponta, usando `WebApplicationFactory`. Os repositórios Oracle são substituídos por versões em memória (via `CustomWebApplicationFactory`), evitando dependência de conexão real com o banco durante os testes.
+
+Todos os testes seguem o padrão **AAA** (Arrange, Act, Assert) e a nomenclatura `MetodoTestado_Cenario_ResultadoEsperado`.
+
+Os testes de integração usam uma **Collection Fixture** (`[Collection("Veti API")]`), permitindo que classes de teste de diferentes Controllers compartilhem a mesma instância da API e os mesmos dados em memória durante a execução — por exemplo, um Pet criado nos testes de `PetsController` pode ser referenciado pelos testes de `ConsultasController`.
+
+### Como executar os testes
+
+**Rodar todos os testes da solução:**
+```bash
+dotnet test
+```
+
+**Rodar apenas os testes unitários:**
+```bash
+dotnet test VetiWebApplication.UnitTests
+```
+
+**Rodar apenas os testes de integração:**
+```bash
+dotnet test VetiWebApplication.IntegrationTests
+```
+
+**Rodar com detalhes de cada teste:**
+```bash
+dotnet test --logger "console;verbosity=detailed"
+```
+
+Alternativamente, pelo Visual Studio: **Teste → Executar Todos os Testes** (ou pelo painel Gerenciador de Testes).
+
 ---
 
 ## 📋 Documentação das Rotas
@@ -315,6 +409,47 @@ VetiWebApplication/
 │   ├── MedicamentosController.cs
 │   ├── ExameMedicamentosController.cs
 │   └── TratamentosController.cs
+├── Services/
+│ ├── TutorService.cs
+│ ├── VeterinarioService.cs
+│ ├── PetService.cs
+│ ├── ConsultaService.cs
+│ ├── ExameService.cs
+│ ├── MedicamentoService.cs
+│ ├── ExameMedicamentoService.cs
+│ └── TratamentoService.cs
+├── Interfaces/
+│ ├── ITutorRepository.cs
+│ ├── IVeterinarioRepository.cs
+│ ├── IPetRepository.cs
+│ ├── IConsultaRepository.cs
+│ ├── IExameRepository.cs
+│ ├── IMedicamentoRepository.cs
+│ ├── IExameMedicamentoRepository.cs
+│ ├── ITratamentoRepository.cs
+│ └── ITratamentoMedicamentoRepository.cs
+├── Repositories/
+│ ├── TutorRepository.cs
+│ ├── VeterinarioRepository.cs
+│ ├── PetRepository.cs
+│ ├── ConsultaRepository.cs
+│ ├── ExameRepository.cs
+│ ├── MedicamentoRepository.cs
+│ ├── ExameMedicamentoRepository.cs
+│ ├── TratamentoRepository.cs
+│ ├── TratamentoMedicamentoRepository.cs
+│ └── EmMemoria/
+│ ├── TutorRepositoryEmMemoria.cs
+│ ├── VeterinarioRepositoryEmMemoria.cs
+│ ├── PetRepositoryEmMemoria.cs
+│ ├── ConsultaRepositoryEmMemoria.cs
+│ ├── ExameRepositoryEmMemoria.cs
+│ ├── MedicamentoRepositoryEmMemoria.cs
+│ ├── ExameMedicamentoRepositoryEmMemoria.cs
+│ ├── TratamentoRepositoryEmMemoria.cs
+│ └── TratamentoMedicamentoRepositoryEmMemoria.cs
+├── HealthChecks/
+│ └── OracleHealthCheck.cs
 ├── Data/
 │   └── AppDbContext.cs
 ├── Models/
@@ -327,6 +462,7 @@ VetiWebApplication/
 │   ├── ExameMedicamento.cs
 │   ├── Tratamento.cs
 │   ├── TratamentoMedicamento.cs
+│   └── Requests/
 │   ├── TutorRequest.cs
 │   ├── VeterinarioRequest.cs
 │   ├── PetRequest.cs
@@ -337,8 +473,31 @@ VetiWebApplication/
 │   ├── TratamentoMedicamentoRequest.cs
 │   └── ExameMedicamentoRequest.cs
 ├── Migrations/
+├── Logs/ (gerado em tempo de execução pelo Serilog)
 ├── appsettings.json
 └── Program.cs
+
+VetiWebApplication.IntegrationTests/
+├── CustomWebApplicationFactory.cs
+├── VetiApiCollection.cs
+├── TutoresControllerTests.cs
+├── PetsControllerTests.cs
+├── VeterinariosControllerTests.cs
+├── ConsultasControllerTests.cs
+├── ExamesControllerTests.cs
+├── MedicamentosControllerTests.cs
+├── ExameMedicamentosControllerTests.cs
+└── TratamentosControllerTests.cs
+
+VetiWebApplication.UnitTests/
+├── TutorServiceTests.cs
+├── PetServiceTests.cs
+├── VeterinarioServiceTests.cs
+├── ConsultaServiceTests.cs
+├── ExameServiceTests.cs
+├── MedicamentoServiceTests.cs
+├── ExameMedicamentoServiceTests.cs
+└── TratamentoServiceTests.cs
 ```
 
 ---
