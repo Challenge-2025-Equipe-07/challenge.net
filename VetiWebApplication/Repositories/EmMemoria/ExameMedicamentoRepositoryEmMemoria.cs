@@ -11,6 +11,18 @@ namespace VetiWebApplication.Repositories.EmMemoria
         // Lista de medicamentos de exames armazenados em memória.
         private readonly List<ExameMedicamento> dbExameMedicamentos = new();
 
+        //Simula o preenchimento dos objetos Exame e Medicamento dentro
+        // da relação ExameMedicamento.
+        private readonly IExameRepository dbExameRepository;
+        private readonly IMedicamentoRepository dbMedicamentoRepository;
+
+        public ExameMedicamentoRepositoryEmMemoria(IExameRepository exameRepository, IMedicamentoRepository medicamentoRepository)
+        {
+            dbExameRepository = exameRepository;
+            dbMedicamentoRepository = medicamentoRepository;
+        }
+
+
         //Método para obter todos os medicamentos e exames relacionados.
         public Task<IEnumerable<ExameMedicamento>> ObterTodosAsync()
         {
@@ -47,10 +59,17 @@ namespace VetiWebApplication.Repositories.EmMemoria
         }
 
         //Método para vincular um medicamento a um exame.
-        public Task<ExameMedicamento> AdicionarAsync(ExameMedicamento exameMedicamento)
+        public async Task<ExameMedicamento> AdicionarAsync(ExameMedicamento exameMedicamento)
         {
+
+            //Simula o preenchimento dos objetos Exame e Medicamento
+            // com base nos IDs, para que o Controller consiga acessar
+            // em.Exame e em.Medicamento.
+            exameMedicamento.Exame = await dbExameRepository.ObterPorIdAsync(exameMedicamento.ExameId);
+            exameMedicamento.Medicamento = await dbMedicamentoRepository.ObterPorIdAsync(exameMedicamento.MedicamentoId);
+
             dbExameMedicamentos.Add(exameMedicamento);
-            return Task.FromResult(exameMedicamento);
+            return exameMedicamento;
         }
 
         //Método para remover uma relação existente.

@@ -15,6 +15,17 @@ namespace VetiWebApplication.Repositories.EmMemoria
         // Contador para gerar IDs únicos para as consultas.
         private int dbProximoId = 1;
 
+        // Simula o preenchimento dos objetos Pet e
+        // Veterinario dentro da Consulta.
+        private readonly IPetRepository dbPetRepository;
+        private readonly IVeterinarioRepository dbVeterinarioRepository;
+
+        public ConsultaRepositoryEmMemoria(IPetRepository petRepository, IVeterinarioRepository veterinarioRepository)
+        {
+            dbPetRepository = petRepository;
+            dbVeterinarioRepository = veterinarioRepository;
+        }
+
 
         //Método para obter todas as consultas armazenadas em memória
         public Task<IEnumerable<Consulta>> ObterTodasAsync()
@@ -38,11 +49,16 @@ namespace VetiWebApplication.Repositories.EmMemoria
 
 
         //Método para adicionar uma nova consulta.
-        public Task<Consulta> AdicionarAsync(Consulta consulta)
+        public async Task<Consulta> AdicionarAsync(Consulta consulta)
         {
             consulta.Id = dbProximoId++;
+
+            // preenche os objetos de navegação com base nos IDs, para que o Controller consiga acessar
+            // consulta.Pet e consulta.Veterinario
+            consulta.Pet = await dbPetRepository.ObterPorIdAsync(consulta.PetId);
+            consulta.Veterinario = await dbVeterinarioRepository.ObterPorIdAsync(consulta.VeterinarioId);
             dbConsultas.Add(consulta);
-            return Task.FromResult(consulta);
+            return consulta;
         }
 
         //Método para atualizar as informações de uma consulta.

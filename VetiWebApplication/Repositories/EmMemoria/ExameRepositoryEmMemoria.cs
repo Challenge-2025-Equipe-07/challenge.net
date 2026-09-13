@@ -13,6 +13,13 @@ namespace VetiWebApplication.Repositories.EmMemoria
         // Contador para gerar IDs únicos para os exames.
         private int dbProximoId = 1;
 
+        // Simula o preenchimento do objeto Consulta dentro do Exame.
+        private readonly IConsultaRepository dbConsultaRepository;
+        public ExameRepositoryEmMemoria(IConsultaRepository consultaRepository)
+        {
+            dbConsultaRepository = consultaRepository;
+        }
+
         //Método para obter todos os exames armazenados em memória.
         public Task<IEnumerable<Exame>> ObterTodosAsync()
         {
@@ -42,11 +49,15 @@ namespace VetiWebApplication.Repositories.EmMemoria
 
 
         //Método para adicionar um novo exame.
-        public Task<Exame> AdicionarAsync(Exame exame)
+        public async Task<Exame> AdicionarAsync(Exame exame)
         {
             exame.Id = dbProximoId++;
+
+            // preenche a Consulta, que já vem com Pet e Veterinario preenchidos, graças ao
+            // ConsultaRepositoryEmMemoria.
+            exame.Consulta = await dbConsultaRepository.ObterPorIdAsync(exame.ConsultaId);
             dbExames.Add(exame);
-            return Task.FromResult(exame);
+            return exame;
         }
 
         //Método para atualizar as informações de um exame.

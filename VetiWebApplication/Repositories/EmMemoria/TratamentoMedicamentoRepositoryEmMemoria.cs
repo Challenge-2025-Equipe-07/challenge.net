@@ -13,6 +13,20 @@ namespace VetiWebApplication.Repositories.EmMemoria
         private readonly List<TratamentoMedicamento> dbTratamentoMedicamentos = new();
 
 
+        //Simula o preenchimento do Tratamento (incluindo sua lista de medicamentos)
+        // e o Medicamento dentro da relação TratamentoMedicamento.
+        private readonly ITratamentoRepository dbTratamentoRepository;
+        private readonly IMedicamentoRepository dbMedicamentoRepository;
+
+        public TratamentoMedicamentoRepositoryEmMemoria(
+            ITratamentoRepository tratamentoRepository,
+            IMedicamentoRepository medicamentoRepository)
+        {
+            dbTratamentoRepository = tratamentoRepository;
+            dbMedicamentoRepository = medicamentoRepository;
+        }
+
+
         //Método que verifica se a relação entre medicamento e tratamento existe
         public Task<bool> ExisteAsync(int tratamentoId, int medicamentoId)
         {
@@ -23,10 +37,21 @@ namespace VetiWebApplication.Repositories.EmMemoria
 
 
         //Método que vincula um medicamento com um tratamento.
-        public Task<TratamentoMedicamento> AdicionarAsync(TratamentoMedicamento tratamentoMedicamento)
+        public async Task<TratamentoMedicamento> AdicionarAsync(TratamentoMedicamento tratamentoMedicamento)
         {
+
+            var tratamento = await dbTratamentoRepository.ObterPorIdAsync(tratamentoMedicamento.TratamentoId);
+            var medicamento = await dbMedicamentoRepository.ObterPorIdAsync(tratamentoMedicamento.MedicamentoId);
+
+            tratamentoMedicamento.Tratamento = tratamento;
+            tratamentoMedicamento.Medicamento = medicamento;
             dbTratamentoMedicamentos.Add(tratamentoMedicamento);
-            return Task.FromResult(tratamentoMedicamento);
+
+            //adiciona essa relação na lista de medicamentos
+            // do próprio Tratamento, para que t.TratamentoMedicamentos reflita
+            // o vínculo recém-criado.
+            tratamento?.TratamentoMedicamentos?.Add(tratamentoMedicamento);
+            return tratamentoMedicamento;
         }
     }
 }

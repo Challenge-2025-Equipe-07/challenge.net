@@ -13,6 +13,15 @@ namespace VetiWebApplication.Repositories.EmMemoria
         // Contador para gerar IDs únicos para os tratamentos.
         private int dbProximoId = 1;
 
+
+        //Simula o preenchimento do objeto Pet dentro do Tratamento.
+        private readonly IPetRepository dbPetRepository;
+
+        public TratamentoRepositoryEmMemoria(IPetRepository petRepository)
+        {
+            dbPetRepository = petRepository;
+        }
+
         //Método para obter todos os tratamentos do banco de dados
         public Task<IEnumerable<Tratamento>> ObterTodosAsync()
         {
@@ -34,11 +43,18 @@ namespace VetiWebApplication.Repositories.EmMemoria
         }
 
         //Método para adicionar um novo tratamento ao banco de dados
-        public Task<Tratamento> AdicionarAsync(Tratamento tratamento)
+        public async Task<Tratamento> AdicionarAsync(Tratamento tratamento)
         {
             tratamento.Id = dbProximoId++;
+            // Simula o preenchimento do Pet com base no PetId.
+            tratamento.Pet = await dbPetRepository.ObterPorIdAsync(tratamento.PetId);
+
+            // Inicializa a lista de medicamentos vazia, para evitar erro de
+            // referência nula quando o Controller tentar fazer .Select() nela.
+            tratamento.TratamentoMedicamentos = new List<TratamentoMedicamento>();
+
             dbTratamentos.Add(tratamento);
-            return Task.FromResult(tratamento);
+            return tratamento;
         }
 
 
